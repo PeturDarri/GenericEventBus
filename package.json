@@ -3,7 +3,7 @@
   "displayName": "GenericEventBus",
   "author": "Pétur Darri Pétursson",
   "version": "0.1.0",
-  "unity": "2018.4",
+  "unity": "2019.4",
   "description": "A synchronous event bus for Unity, using strictly typed events and generics to reduce runtime overhead.",
   "type": "library"
 }
