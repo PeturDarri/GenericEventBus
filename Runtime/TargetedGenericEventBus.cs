@@ -1,13 +1,11 @@
-﻿using System.Runtime.CompilerServices;
-
-namespace GenericEventBus
+﻿namespace GenericEventBus
 {
 	/// <summary>
 	/// An event bus that has the concept of a target and a source object for every raised event.
 	/// </summary>
 	/// <inheritdoc/>
 	/// <typeparam name="TObject">The type for the target and source objects, e.g. <see cref="UnityEngine.GameObject"/>.</typeparam>
-	public class GenericEventBus<TBaseEvent, TObject> : GenericEventBus<TBaseEvent>
+	internal class GenericEventBus<TBaseEvent, TObject> : GenericEventBus<TBaseEvent>
 	{
 		public delegate void TargetedEventHandler<TEvent>(ref TEvent eventData, TObject target, TObject source);
 
