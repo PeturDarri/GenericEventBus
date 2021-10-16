@@ -14,14 +14,5 @@
 		/// <para>If a listener subscribes to an event to or from an object that equals this, the listener will receive all the events, regardless of the target or source.</para>
 		/// </summary>
 		public TObject DefaultObject { get; set; } = default;
-
-		public override void Raise<TEvent>(ref TEvent @event)
-		{
-			Raise(ref @event, DefaultObject, DefaultObject);
-		}
-
-		public void Raise<TEvent>(ref TEvent @event, TObject target, TObject source)
-		{
-		}
 	}
 }

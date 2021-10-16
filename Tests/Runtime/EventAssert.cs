@@ -14,7 +14,7 @@ namespace GenericEventBus.Tests
 		}
 		
 		public static void AssertListenersInvokedInOrder<TEvent>(this TestEventBus bus, TEvent eventData,
-			params TestListener<TEvent>[] listeners) where TEvent : ITestEvent
+			params TestListener[] listeners) where TEvent : ITestEvent
 		{
 			AssertListenersInvokedInOrder(bus, eventData, listeners, listeners);
 		}
@@ -22,7 +22,13 @@ namespace GenericEventBus.Tests
 		public static void AssertListenersInvokedInOrder<TEvent>(this TestEventBus bus, TEvent eventData,
 			TestListener<TEvent>[] listeners, TestListener<TEvent>[] expectedOrder) where TEvent : ITestEvent
 		{
-			var eventReceivedList = new List<TestListener<TEvent>>(listeners.Length);
+			AssertListenersInvokedInOrder(bus, eventData, (TestListener[]) listeners, expectedOrder);
+		}
+
+		public static void AssertListenersInvokedInOrder<TEvent>(this TestEventBus bus, TEvent eventData,
+			TestListener[] listeners, TestListener[] expectedOrder) where TEvent : ITestEvent
+		{
+			var eventReceivedList = new List<TestListener>(listeners.Length);
 
 			foreach (var listener in listeners)
 			{
@@ -35,7 +41,7 @@ namespace GenericEventBus.Tests
 
 			CollectionAssert.AreEqual(expectedOrder, eventReceivedList, "Listeners were not invoked in the expected order.");
 
-			void OnListenerReceivedEvent(TestListener<TEvent> listener, TEvent @event)
+			void OnListenerReceivedEvent(TestListener listener)
 			{
 				listener.EventReceivedEvent -= OnListenerReceivedEvent;
 				

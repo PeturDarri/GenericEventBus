@@ -1,4 +1,6 @@
-﻿namespace GenericEventBus.Tests
+﻿using System;
+
+namespace GenericEventBus.Tests
 {
 	public class TestEventBus : GenericEventBus<ITestEvent>
 	{
@@ -12,6 +14,15 @@
 		{
 			var listener = TestListener<TEvent>();
 			listener.Subscribe(priority, callback);
+
+			return listener;
+		}
+
+		public TestListener<TEvent> TestListen<TEvent>(Action callback,
+			float priority = 0) where TEvent : ITestEvent
+		{
+			var listener = TestListener<TEvent>();
+			listener.Subscribe(callback, priority);
 
 			return listener;
 		}

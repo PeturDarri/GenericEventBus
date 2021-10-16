@@ -3,9 +3,22 @@ using NUnit.Framework;
 
 namespace GenericEventBus.Tests
 {
-	public class TestListener<TEvent> where TEvent : ITestEvent
+	public abstract class TestListener
 	{
-		public delegate void EventReceivedHandler(TestListener<TEvent> listener, TEvent eventData);
+		public delegate void EventReceivedHandler(TestListener listener);
+		
+		public bool DidReceiveEvent { get; protected set; }
+		public event EventReceivedHandler EventReceivedEvent;
+
+		protected void InvokeEventReceivedEvent()
+		{
+			EventReceivedEvent?.Invoke(this);
+		}
+	}
+	
+	public class TestListener<TEvent> : TestListener where TEvent : ITestEvent
+	{
+		public new delegate void EventReceivedHandler(TestListener<TEvent> listener);
 		
 		private readonly TestEventBus _bus;
 
@@ -16,10 +29,8 @@ namespace GenericEventBus.Tests
 			_bus = bus;
 		}
 
-		public bool DidReceiveEvent { get; private set; }
 		public TEvent LastReceivedEvent { get; private set; }
-
-		public event EventReceivedHandler EventReceivedEvent;
+		public new event EventReceivedHandler EventReceivedEvent;
 
 		public void Subscribe(float priority = 0, EventReceivedHandler callback = null)
 		{
@@ -35,11 +46,11 @@ namespace GenericEventBus.Tests
 			_callback = callback;
 		}
 
-		public void Subscribe(Action callback)
+		public void Subscribe(Action callback, float priority = 0)
 		{
-			_bus.SubscribeTo<TEvent>(OnEvent);
+			_bus.SubscribeTo<TEvent>(OnEvent, priority);
 
-			_callback = (_, __) => callback();
+			_callback = _ => callback();
 		}
 
 		public void Unsubscribe()
@@ -64,8 +75,10 @@ namespace GenericEventBus.Tests
 			DidReceiveEvent = true;
 			LastReceivedEvent = eventData;
 			
-			EventReceivedEvent?.Invoke(this, eventData);
-			_callback?.Invoke(this, eventData);
+			EventReceivedEvent?.Invoke(this);
+			InvokeEventReceivedEvent();
+			
+			_callback?.Invoke(this);
 			_callback = null;
 		}
 	}

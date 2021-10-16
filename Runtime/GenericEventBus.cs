@@ -14,6 +14,22 @@ namespace GenericEventBus
 	/// <typeparam name="TBaseEvent"><para>The base type all events must inherit/implement.</para> If you don't want to restrict event types to a base type, use <see cref="object"/> as the base type.</typeparam>
 	public class GenericEventBus<TBaseEvent>
 	{
+		static GenericEventBus()
+		{
+			// Initialize some things to avoid allocation on first use.
+			var comparer = EqualityComparer<uint>.Default;
+		}
+
+		private readonly List<uint> _raiseRecursionsConsumed = new List<uint>();
+		private readonly Queue<QueuedEvent> _queuedEvents = new Queue<QueuedEvent>(32);
+
+		private uint _currentRaiseRecursionDepth;
+
+		private bool CurrentEventIsConsumed =>
+			_currentRaiseRecursionDepth > 0 && _raiseRecursionsConsumed.Contains(_currentRaiseRecursionDepth);
+
+		private bool IsEventBeingRaised => _currentRaiseRecursionDepth > 0;
+
 		/// <summary>
 		/// A delegate for the callback methods given when subscribing to an event type.
 		/// </summary>
@@ -22,34 +38,83 @@ namespace GenericEventBus
 		public delegate void EventHandler<TEvent>(ref TEvent eventData) where TEvent : TBaseEvent;
 
 		/// <summary>
-		/// Raises the given event, without	<c>ref</c>.
+		/// Raises the given event immediately, regardless if another event is currently still being raised.
 		/// </summary>
 		/// <param name="event">The event to raise.</param>
 		/// <typeparam name="TEvent">The type of event to raise.</typeparam>
-		public void Raise<TEvent>(TEvent @event) where TEvent : TBaseEvent
+		public void RaiseImmediately<TEvent>(TEvent @event) where TEvent : TBaseEvent
 		{
-			Raise(ref @event);
+			RaiseImmediately(ref @event);
 		}
 
 		/// <summary>
-		/// Raises the given event.
+		/// Raises the given event immediately, regardless if another event is currently still being raised.
 		/// </summary>
 		/// <param name="event">The event to raise.</param>
 		/// <typeparam name="TEvent">The type of event to raise.</typeparam>
-		public virtual void Raise<TEvent>(ref TEvent @event) where TEvent : TBaseEvent
+		public virtual void RaiseImmediately<TEvent>(ref TEvent @event) where TEvent : TBaseEvent
 		{
-			var listeners = EventListeners<TEvent>.GetListeners(this);
+			_currentRaiseRecursionDepth++;
 
-			foreach (var listener in listeners)
+			try
 			{
-				try
+				var listeners = EventListeners<TEvent>.GetListeners(this);
+
+				foreach (var listener in listeners)
 				{
-					listener.Invoke(ref @event);
+					try
+					{
+						listener.Invoke(ref @event);
+					}
+					catch (Exception e)
+					{
+						Debug.LogException(e);
+					}
+
+					if (CurrentEventIsConsumed)
+					{
+						break;
+					}
 				}
-				catch (Exception e)
+			}
+			catch (Exception e)
+			{
+				Debug.LogException(e);
+			}
+			finally
+			{
+				_raiseRecursionsConsumed.Remove(_currentRaiseRecursionDepth);
+
+				_currentRaiseRecursionDepth--;
+
+				if (_currentRaiseRecursionDepth == 0)
 				{
-					Debug.LogException(e);
+					_raiseRecursionsConsumed.Clear();
+
+					while (_queuedEvents.Count > 0)
+					{
+						var queuedEvent = _queuedEvents.Dequeue();
+						queuedEvent.Raise(this);
+					}
 				}
+			}
+		}
+
+		/// <summary>
+		/// Raises the given event. If there are other events currently being raised, this event will be raised after those events finish.
+		/// </summary>
+		/// <param name="event">The event to raise.</param>
+		/// <typeparam name="TEvent">The type of event to raise.</typeparam>
+		public virtual void Raise<TEvent>(in TEvent @event) where TEvent : TBaseEvent
+		{
+			if (!IsEventBeingRaised)
+			{
+				RaiseImmediately(@event);
+			}
+			else
+			{
+				var listeners = EventListeners<TEvent>.GetListeners(this);
+				listeners.EnqueueEvent(in @event);
 			}
 		}
 
@@ -78,6 +143,21 @@ namespace GenericEventBus
 			listeners.RemoveListener(handler);
 		}
 
+		public virtual void ConsumeCurrentEvent()
+		{
+			if (_currentRaiseRecursionDepth == 0) return;
+			
+			if (!_raiseRecursionsConsumed.Contains(_currentRaiseRecursionDepth))
+			{
+				_raiseRecursionsConsumed.Add(_currentRaiseRecursionDepth);
+			}
+		}
+
+		private abstract class QueuedEvent
+		{
+			public abstract void Raise(GenericEventBus<TBaseEvent> eventBus);
+		}
+
 		/// <summary>
 		/// Generic class that keeps track of all the listeners for each event type.
 		/// </summary>
@@ -89,9 +169,12 @@ namespace GenericEventBus
 
 			private static readonly ObjectPool<Enumerator> EnumeratorPool = new ObjectPool<Enumerator>();
 
+			private static readonly ObjectPool<SpecificQueuedEvent> QueuedEventPool =
+				new ObjectPool<SpecificQueuedEvent>();
+
 			private static readonly
 				ConditionalWeakTable<GenericEventBus<TBaseEvent>, EventListeners<TEvent>>.CreateValueCallback
-				CreateListeners = key => new EventListeners<TEvent>();
+				CreateListeners = key => new EventListeners<TEvent>(key);
 
 			static EventListeners()
 			{
@@ -108,8 +191,14 @@ namespace GenericEventBus
 				return Listeners.GetValue(eventBus, CreateListeners);
 			}
 
+			private readonly GenericEventBus<TBaseEvent> _eventBus;
 			private readonly List<Listener> _sortedListeners = new List<Listener>();
 			private readonly List<Enumerator> _activeEnumerators = new List<Enumerator>(4);
+
+			private EventListeners(GenericEventBus<TBaseEvent> eventBus)
+			{
+				_eventBus = eventBus;
+			}
 
 			/// <summary>
 			/// Add a new listener to this event type, sorted by the given priority.
@@ -153,6 +242,30 @@ namespace GenericEventBus
 				}
 			}
 
+			/// <summary>
+			/// Adds this event to the queue, to be raised when the current events have finished.
+			/// </summary>
+			/// <param name="event">The event to add to the queue.</param>
+			public void EnqueueEvent(in TEvent @event)
+			{
+				var queuedEvent = QueuedEventPool.Get();
+				queuedEvent.EventData = @event;
+				_eventBus._queuedEvents.Enqueue(queuedEvent);
+			}
+
+			private class SpecificQueuedEvent : QueuedEvent
+			{
+				public TEvent EventData;
+				
+				public override void Raise(GenericEventBus<TBaseEvent> eventBus)
+				{
+					eventBus.Raise(EventData);
+					
+					EventData = default;
+					QueuedEventPool.Release(this);
+				}
+			}
+			
 			private readonly struct Listener : IEquatable<Listener>, IComparable<Listener>
 			{
 				public readonly EventHandler<TEvent> Handler;
