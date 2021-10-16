@@ -28,7 +28,15 @@ public struct GameStartedEvent : IEvent
 {
 }
 ```
+<details>
+  <summary><em>Can events be defined as classes instead?</em></summary>
+
 Events can be defined as either `class` or `struct`, but I recommend using structs to avoid allocation when creating new instances. Events are passed around in the event bus and to listeners by references  using `ref`, so you don't have to worry about the overhead of struct copying.
+
+And you also don't need to worry about the struct being boxed. Generic type parameters ensure it is never boxed.
+</details>
+
+---
 
 This event can now be raised:
 ```c#
