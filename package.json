@@ -1,0 +1,10 @@
+{
+	"name": "com.peturdarri.generic-event-bus",
+	"displayName": "GenericEventBus",
+	"author": "Pétur Darri Pétursson",
+	"version": "0.1.0",
+	"unity": "2021.1",
+	"description": "An event bus.\n\nNote: Special formatting characters are supported, including line breaks ('\\n') and bullets ('\\u25AA').",
+	"dependencies": {
+	}
+}

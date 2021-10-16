@@ -1,0 +1,5 @@
+﻿{
+  "displayName":"Global Event Bus Example",
+  "description": "An example of having a globally accessible event bus for high-level game events.",
+  "createSeparatePackage": false
+}
