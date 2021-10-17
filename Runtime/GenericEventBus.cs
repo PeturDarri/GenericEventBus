@@ -21,14 +21,15 @@ namespace GenericEventBus
 		}
 
 		private readonly List<uint> _raiseRecursionsConsumed = new List<uint>();
-		private readonly Queue<QueuedEvent> _queuedEvents = new Queue<QueuedEvent>(32);
+		
+		protected readonly Queue<QueuedEvent> QueuedEvents = new Queue<QueuedEvent>(32);
 
 		private uint _currentRaiseRecursionDepth;
 
-		private bool CurrentEventIsConsumed =>
+		protected bool CurrentEventIsConsumed =>
 			_currentRaiseRecursionDepth > 0 && _raiseRecursionsConsumed.Contains(_currentRaiseRecursionDepth);
 
-		private bool IsEventBeingRaised => _currentRaiseRecursionDepth > 0;
+		protected bool IsEventBeingRaised => _currentRaiseRecursionDepth > 0;
 
 		/// <summary>
 		/// A delegate for the callback methods given when subscribing to an event type.
@@ -54,7 +55,7 @@ namespace GenericEventBus
 		/// <typeparam name="TEvent">The type of event to raise.</typeparam>
 		public virtual void RaiseImmediately<TEvent>(ref TEvent @event) where TEvent : TBaseEvent
 		{
-			_currentRaiseRecursionDepth++;
+			OnBeforeRaiseEvent();
 
 			try
 			{
@@ -64,7 +65,7 @@ namespace GenericEventBus
 				{
 					try
 					{
-						listener.Invoke(ref @event);
+						listener?.Invoke(ref @event);
 					}
 					catch (Exception e)
 					{
@@ -83,20 +84,7 @@ namespace GenericEventBus
 			}
 			finally
 			{
-				_raiseRecursionsConsumed.Remove(_currentRaiseRecursionDepth);
-
-				_currentRaiseRecursionDepth--;
-
-				if (_currentRaiseRecursionDepth == 0)
-				{
-					_raiseRecursionsConsumed.Clear();
-
-					while (_queuedEvents.Count > 0)
-					{
-						var queuedEvent = _queuedEvents.Dequeue();
-						queuedEvent.Raise(this);
-					}
-				}
+				OnAfterRaiseEvent();
 			}
 		}
 
@@ -143,7 +131,7 @@ namespace GenericEventBus
 			listeners.RemoveListener(handler);
 		}
 
-		public virtual void ConsumeCurrentEvent()
+		public void ConsumeCurrentEvent()
 		{
 			if (_currentRaiseRecursionDepth == 0) return;
 			
@@ -153,24 +141,43 @@ namespace GenericEventBus
 			}
 		}
 
-		private abstract class QueuedEvent
+		protected void OnBeforeRaiseEvent()
+		{
+			_currentRaiseRecursionDepth++;
+		}
+
+		protected void OnAfterRaiseEvent()
+		{
+			_raiseRecursionsConsumed.Remove(_currentRaiseRecursionDepth);
+
+			_currentRaiseRecursionDepth--;
+
+			if (_currentRaiseRecursionDepth == 0)
+			{
+				_raiseRecursionsConsumed.Clear();
+
+				while (QueuedEvents.Count > 0)
+				{
+					var queuedEvent = QueuedEvents.Dequeue();
+					queuedEvent.Raise(this);
+				}
+			}
+		}
+
+		protected abstract class QueuedEvent
 		{
 			public abstract void Raise(GenericEventBus<TBaseEvent> eventBus);
 		}
-
-		/// <summary>
-		/// Generic class that keeps track of all the listeners for each event type.
-		/// </summary>
-		/// <typeparam name="TEvent">The event type this class manages.</typeparam>
-		protected sealed class EventListeners<TEvent> : IEnumerable<EventHandler<TEvent>> where TEvent : TBaseEvent
+		
+		private sealed class EventListeners<TEvent> : IEnumerable<EventHandler<TEvent>> where TEvent : TBaseEvent
 		{
 			private static readonly ConditionalWeakTable<GenericEventBus<TBaseEvent>, EventListeners<TEvent>>
 				Listeners = new ConditionalWeakTable<GenericEventBus<TBaseEvent>, EventListeners<TEvent>>();
 
 			private static readonly ObjectPool<Enumerator> EnumeratorPool = new ObjectPool<Enumerator>();
 
-			private static readonly ObjectPool<SpecificQueuedEvent> QueuedEventPool =
-				new ObjectPool<SpecificQueuedEvent>();
+			private static readonly ObjectPool<DerivedQueuedEvent> QueuedEventPool =
+				new ObjectPool<DerivedQueuedEvent>();
 
 			private static readonly
 				ConditionalWeakTable<GenericEventBus<TBaseEvent>, EventListeners<TEvent>>.CreateValueCallback
@@ -182,10 +189,6 @@ namespace GenericEventBus
 				var enumeratorComparer = EqualityComparer<Enumerator>.Default;
 			}
 
-			/// <summary>
-			/// Get all the listeners for this event type.
-			/// </summary>
-			/// <param name="eventBus">The event bus to get listeners from.</param>
 			public static EventListeners<TEvent> GetListeners(GenericEventBus<TBaseEvent> eventBus)
 			{
 				return Listeners.GetValue(eventBus, CreateListeners);
@@ -200,11 +203,6 @@ namespace GenericEventBus
 				_eventBus = eventBus;
 			}
 
-			/// <summary>
-			/// Add a new listener to this event type, sorted by the given priority.
-			/// </summary>
-			/// <param name="handler">The method callback of the listener to add.</param>
-			/// <param name="priority">The priority of the listener.</param>
 			public void AddListener(EventHandler<TEvent> handler, float priority)
 			{
 				var listener = new Listener(handler, priority);
@@ -219,11 +217,7 @@ namespace GenericEventBus
 					}
 				}
 			}
-
-			/// <summary>
-			/// Remove a listener from this event type.
-			/// </summary>
-			/// <param name="handler">The method callback of the listener to remove.</param>
+			
 			public void RemoveListener(EventHandler<TEvent> handler)
 			{
 				for (var i = _sortedListeners.Count - 1; i >= 0; i--)
@@ -242,18 +236,14 @@ namespace GenericEventBus
 				}
 			}
 
-			/// <summary>
-			/// Adds this event to the queue, to be raised when the current events have finished.
-			/// </summary>
-			/// <param name="event">The event to add to the queue.</param>
 			public void EnqueueEvent(in TEvent @event)
 			{
 				var queuedEvent = QueuedEventPool.Get();
 				queuedEvent.EventData = @event;
-				_eventBus._queuedEvents.Enqueue(queuedEvent);
+				_eventBus.QueuedEvents.Enqueue(queuedEvent);
 			}
 
-			private class SpecificQueuedEvent : QueuedEvent
+			private class DerivedQueuedEvent : QueuedEvent
 			{
 				public TEvent EventData;
 				
