@@ -36,6 +36,14 @@ namespace GenericEventBus
 			return Raise(@event, DefaultObject, DefaultObject);
 		}
 
+		/// <summary>
+		/// <para>Raises the given event. If there are other events currently being raised, this event will be raised after those events finish.</para>
+		/// </summary>
+		/// <param name="event">The event to raise.</param>
+		/// <param name="target">The target object for this event.</param>
+		/// <param name="source">The source object for this event.</param>
+		/// <typeparam name="TEvent">The type of event to raise.</typeparam>
+		/// <returns>If the event was raised immediately, returns true if the event was consumed with <see cref="GenericEventBus{TBaseEvent}.ConsumeCurrentEvent"/>.</returns>
 		public bool Raise<TEvent>(TEvent @event, TObject target, TObject source) where TEvent : TBaseEvent
 		{
 			if (!IsEventBeingRaised)
@@ -54,11 +62,27 @@ namespace GenericEventBus
 			return RaiseImmediately(ref @event, DefaultObject, DefaultObject);
 		}
 
+		/// <summary>
+		/// <para>Raises the given event immediately, regardless if another event is currently still being raised.</para>
+		/// </summary>
+		/// <param name="event">The event to raise.</param>
+		/// <param name="target">The target object for this event.</param>
+		/// <param name="source">The source object for this event.</param>
+		/// <typeparam name="TEvent">The type of event to raise.</typeparam>
+		/// <returns>Returns true if the event was consumed with <see cref="GenericEventBus{TBaseEvent}.ConsumeCurrentEvent"/>.</returns>
 		public bool RaiseImmediately<TEvent>(TEvent @event, TObject target, TObject source) where TEvent : TBaseEvent
 		{
 			return RaiseImmediately(ref @event, target, source);
 		}
 
+		/// <summary>
+		/// <para>Raises the given event immediately, regardless if another event is currently still being raised.</para>
+		/// </summary>
+		/// <param name="event">The event to raise.</param>
+		/// <param name="target">The target object for this event.</param>
+		/// <param name="source">The source object for this event.</param>
+		/// <typeparam name="TEvent">The type of event to raise.</typeparam>
+		/// <returns>Returns true if the event was consumed with <see cref="GenericEventBus{TBaseEvent}.ConsumeCurrentEvent"/>.</returns>
 		public bool RaiseImmediately<TEvent>(ref TEvent @event, TObject target, TObject source)
 			where TEvent : TBaseEvent
 		{
@@ -106,6 +130,13 @@ namespace GenericEventBus
 			listeners.AddListener(handler, priority);
 		}
 
+		/// <summary>
+		/// Subscribe to a given event type.
+		/// </summary>
+		/// <param name="handler">The method that should be invoked when the event is raised.</param>
+		/// <param name="priority">Higher priority means this listener will receive the event earlier than other listeners with lower priority.
+		///                        If multiple listeners have the same priority, they will be invoked in the order they subscribed.</param>
+		/// <typeparam name="TEvent">The event type to subscribe to.</typeparam>
 		public void SubscribeTo<TEvent>(TargetedEventHandler<TEvent> handler, float priority = 0)
 			where TEvent : TBaseEvent
 		{
@@ -119,12 +150,25 @@ namespace GenericEventBus
 			listeners.RemoveListener(handler);
 		}
 
+		/// <summary>
+		/// Unsubscribe from a given event type.
+		/// </summary>
+		/// <param name="handler">The method that was previously given in SubscribeTo.</param>
+		/// <typeparam name="TEvent">The event type to unsubscribe from.</typeparam>
 		public void UnsubscribeFrom<TEvent>(TargetedEventHandler<TEvent> handler) where TEvent : TBaseEvent
 		{
 			var listeners = TargetedEventListeners<TEvent>.Get(this);
 			listeners.RemoveListener(handler);
 		}
 
+		/// <summary>
+		/// Subscribe to a given event type, but only if it targets the given object.
+		/// </summary>
+		/// <param name="target">The target object.</param>
+		/// <param name="handler">The method that should be invoked when the event is raised.</param>
+		/// <param name="priority">Higher priority means this listener will receive the event earlier than other listeners with lower priority.
+		///                        If multiple listeners have the same priority, they will be invoked in the order they subscribed.</param>
+		/// <typeparam name="TEvent">The event type to subscribe to.</typeparam>
 		public void SubscribeToTarget<TEvent>(TObject target, TargetedEventHandler<TEvent> handler, float priority = 0)
 			where TEvent : TBaseEvent
 		{
@@ -132,6 +176,12 @@ namespace GenericEventBus
 			listeners.AddTargetListener(target, handler, priority);
 		}
 
+		/// <summary>
+		/// Unsubscribe from a given event type, but only if it targets the given object.
+		/// </summary>
+		/// <param name="target">The target object.</param>
+		/// <param name="handler">The method that was previously given in SubscribeToTarget.</param>
+		/// <typeparam name="TEvent">The event type to unsubscribe from.</typeparam>
 		public void UnsubscribeFromTarget<TEvent>(TObject target, TargetedEventHandler<TEvent> handler)
 			where TEvent : TBaseEvent
 		{
@@ -139,6 +189,14 @@ namespace GenericEventBus
 			listeners.RemoveTargetListener(target, handler);
 		}
 
+		/// <summary>
+		/// Subscribe to a given event type, but only if it comes from the given object.
+		/// </summary>
+		/// <param name="source">The source object.</param>
+		/// <param name="handler">The method that should be invoked when the event is raised.</param>
+		/// <param name="priority">Higher priority means this listener will receive the event earlier than other listeners with lower priority.
+		///                        If multiple listeners have the same priority, they will be invoked in the order they subscribed.</param>
+		/// <typeparam name="TEvent">The event type to subscribe to.</typeparam>
 		public void SubscribeToSource<TEvent>(TObject source, TargetedEventHandler<TEvent> handler, float priority = 0)
 			where TEvent : TBaseEvent
 		{
@@ -146,6 +204,12 @@ namespace GenericEventBus
 			listeners.AddSourceListener(source, handler, priority);
 		}
 
+		/// <summary>
+		/// Unsubscribe from a given event type, but only if it comes from the given object.
+		/// </summary>
+		/// <param name="source">The source object.</param>
+		/// <param name="handler">The method that was previously given in SubscribeToSource.</param>
+		/// <typeparam name="TEvent">The event type to unsubscribe from.</typeparam>
 		public void UnsubscribeFromSource<TEvent>(TObject source, TargetedEventHandler<TEvent> handler)
 			where TEvent : TBaseEvent
 		{

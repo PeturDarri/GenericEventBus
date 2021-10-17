@@ -26,9 +26,15 @@ namespace GenericEventBus
 
 		private uint _currentRaiseRecursionDepth;
 
+		/// <summary>
+		/// Has the current raised event been consumed?
+		/// </summary>
 		public bool CurrentEventIsConsumed =>
 			_currentRaiseRecursionDepth > 0 && _raiseRecursionsConsumed.Contains(_currentRaiseRecursionDepth);
 
+		/// <summary>
+		/// Is an event currently being raised?
+		/// </summary>
 		public bool IsEventBeingRaised => _currentRaiseRecursionDepth > 0;
 
 		/// <summary>
@@ -39,20 +45,22 @@ namespace GenericEventBus
 		public delegate void EventHandler<TEvent>(ref TEvent eventData) where TEvent : TBaseEvent;
 
 		/// <summary>
-		/// Raises the given event immediately, regardless if another event is currently still being raised.
+		/// <para>Raises the given event immediately, regardless if another event is currently still being raised.</para>
 		/// </summary>
 		/// <param name="event">The event to raise.</param>
 		/// <typeparam name="TEvent">The type of event to raise.</typeparam>
+		/// <returns>Returns true if the event was consumed with <see cref="ConsumeCurrentEvent"/>.</returns>
 		public bool RaiseImmediately<TEvent>(TEvent @event) where TEvent : TBaseEvent
 		{
 			return RaiseImmediately(ref @event);
 		}
 
 		/// <summary>
-		/// Raises the given event immediately, regardless if another event is currently still being raised.
+		/// <para>Raises the given event immediately, regardless if another event is currently still being raised.</para>
 		/// </summary>
 		/// <param name="event">The event to raise.</param>
 		/// <typeparam name="TEvent">The type of event to raise.</typeparam>
+		/// <returns>Returns true if the event was consumed with <see cref="ConsumeCurrentEvent"/>.</returns>
 		public virtual bool RaiseImmediately<TEvent>(ref TEvent @event) where TEvent : TBaseEvent
 		{
 			var wasConsumed = false;
@@ -94,10 +102,11 @@ namespace GenericEventBus
 		}
 
 		/// <summary>
-		/// Raises the given event. If there are other events currently being raised, this event will be raised after those events finish.
+		/// <para>Raises the given event. If there are other events currently being raised, this event will be raised after those events finish.</para>
 		/// </summary>
 		/// <param name="event">The event to raise.</param>
 		/// <typeparam name="TEvent">The type of event to raise.</typeparam>
+		/// <returns>If the event was raised immediately, returns true if the event was consumed with <see cref="ConsumeCurrentEvent"/>.</returns>
 		public virtual bool Raise<TEvent>(in TEvent @event) where TEvent : TBaseEvent
 		{
 			if (!IsEventBeingRaised)
@@ -136,6 +145,9 @@ namespace GenericEventBus
 			listeners.RemoveListener(handler);
 		}
 
+		/// <summary>
+		/// Consumes the current event being raised, which stops the propagation to other listeners.
+		/// </summary>
 		public void ConsumeCurrentEvent()
 		{
 			if (_currentRaiseRecursionDepth == 0) return;
@@ -146,6 +158,11 @@ namespace GenericEventBus
 			}
 		}
 
+		/// <summary>
+		/// Removes all the listeners of the given event type.
+		/// </summary>
+		/// <typeparam name="TEvent">The event type.</typeparam>
+		/// <exception cref="InvalidOperationException">Thrown if an event is currently being raised.</exception>
 		public void ClearListeners<TEvent>() where TEvent : TBaseEvent
 		{
 			if (IsEventBeingRaised)
