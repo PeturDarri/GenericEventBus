@@ -31,37 +31,39 @@ namespace GenericEventBus
 			return ObjectComparer.Equals(obj, _defaultObject);
 		}
 
-		public override void Raise<TEvent>(in TEvent @event)
+		public override bool Raise<TEvent>(in TEvent @event)
 		{
-			Raise(@event, DefaultObject, DefaultObject);
+			return Raise(@event, DefaultObject, DefaultObject);
 		}
 
-		public void Raise<TEvent>(TEvent @event, TObject target, TObject source) where TEvent : TBaseEvent
+		public bool Raise<TEvent>(TEvent @event, TObject target, TObject source) where TEvent : TBaseEvent
 		{
 			if (!IsEventBeingRaised)
 			{
-				RaiseImmediately(ref @event, target, source);
+				return RaiseImmediately(ref @event, target, source);
 			}
-			else
-			{
-				var listeners = TargetedEventListeners<TEvent>.Get(this);
-				listeners.EnqueueEvent(in @event, target, source);
-			}
+
+			var listeners = TargetedEventListeners<TEvent>.Get(this);
+			listeners.EnqueueEvent(in @event, target, source);
+
+			return false;
 		}
 
-		public override void RaiseImmediately<TEvent>(ref TEvent @event)
+		public override bool RaiseImmediately<TEvent>(ref TEvent @event)
 		{
-			RaiseImmediately(ref @event, DefaultObject, DefaultObject);
+			return RaiseImmediately(ref @event, DefaultObject, DefaultObject);
 		}
 
-		public void RaiseImmediately<TEvent>(TEvent @event, TObject target, TObject source) where TEvent : TBaseEvent
+		public bool RaiseImmediately<TEvent>(TEvent @event, TObject target, TObject source) where TEvent : TBaseEvent
 		{
-			RaiseImmediately(ref @event, target, source);
+			return RaiseImmediately(ref @event, target, source);
 		}
 
-		public void RaiseImmediately<TEvent>(ref TEvent @event, TObject target, TObject source)
+		public bool RaiseImmediately<TEvent>(ref TEvent @event, TObject target, TObject source)
 			where TEvent : TBaseEvent
 		{
+			var wasConsumed = false;
+			
 			OnBeforeRaiseEvent();
 
 			try
@@ -81,6 +83,7 @@ namespace GenericEventBus
 
 					if (CurrentEventIsConsumed)
 					{
+						wasConsumed = true;
 						break;
 					}
 				}
@@ -93,6 +96,8 @@ namespace GenericEventBus
 			{
 				OnAfterRaiseEvent();
 			}
+
+			return wasConsumed;
 		}
 
 		public override void SubscribeTo<TEvent>(EventHandler<TEvent> handler, float priority = 0)
@@ -146,6 +151,12 @@ namespace GenericEventBus
 		{
 			var listeners = TargetedEventListeners<TEvent>.Get(this);
 			listeners.RemoveSourceListener(source, handler);
+		}
+
+		protected override void ClearAllListeners<TEvent>()
+		{
+			var listeners = TargetedEventListeners<TEvent>.Get(this);
+			listeners.Clear();
 		}
 
 		private class TargetedEventListeners<TEvent> where TEvent : TBaseEvent
@@ -574,6 +585,13 @@ namespace GenericEventBus
 				{
 					return GetEnumerator();
 				}
+			}
+
+			public void Clear()
+			{
+				_sortedListeners.Clear();
+				_targetListeners.Clear();
+				_sourceListeners.Clear();
 			}
 		}
 	}

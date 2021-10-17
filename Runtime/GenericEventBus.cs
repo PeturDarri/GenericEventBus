@@ -26,10 +26,10 @@ namespace GenericEventBus
 
 		private uint _currentRaiseRecursionDepth;
 
-		protected bool CurrentEventIsConsumed =>
+		public bool CurrentEventIsConsumed =>
 			_currentRaiseRecursionDepth > 0 && _raiseRecursionsConsumed.Contains(_currentRaiseRecursionDepth);
 
-		protected bool IsEventBeingRaised => _currentRaiseRecursionDepth > 0;
+		public bool IsEventBeingRaised => _currentRaiseRecursionDepth > 0;
 
 		/// <summary>
 		/// A delegate for the callback methods given when subscribing to an event type.
@@ -43,9 +43,9 @@ namespace GenericEventBus
 		/// </summary>
 		/// <param name="event">The event to raise.</param>
 		/// <typeparam name="TEvent">The type of event to raise.</typeparam>
-		public void RaiseImmediately<TEvent>(TEvent @event) where TEvent : TBaseEvent
+		public bool RaiseImmediately<TEvent>(TEvent @event) where TEvent : TBaseEvent
 		{
-			RaiseImmediately(ref @event);
+			return RaiseImmediately(ref @event);
 		}
 
 		/// <summary>
@@ -53,8 +53,10 @@ namespace GenericEventBus
 		/// </summary>
 		/// <param name="event">The event to raise.</param>
 		/// <typeparam name="TEvent">The type of event to raise.</typeparam>
-		public virtual void RaiseImmediately<TEvent>(ref TEvent @event) where TEvent : TBaseEvent
+		public virtual bool RaiseImmediately<TEvent>(ref TEvent @event) where TEvent : TBaseEvent
 		{
+			var wasConsumed = false;
+			
 			OnBeforeRaiseEvent();
 
 			try
@@ -74,6 +76,7 @@ namespace GenericEventBus
 
 					if (CurrentEventIsConsumed)
 					{
+						wasConsumed = true;
 						break;
 					}
 				}
@@ -86,6 +89,8 @@ namespace GenericEventBus
 			{
 				OnAfterRaiseEvent();
 			}
+			
+			return wasConsumed;
 		}
 
 		/// <summary>
@@ -93,17 +98,17 @@ namespace GenericEventBus
 		/// </summary>
 		/// <param name="event">The event to raise.</param>
 		/// <typeparam name="TEvent">The type of event to raise.</typeparam>
-		public virtual void Raise<TEvent>(in TEvent @event) where TEvent : TBaseEvent
+		public virtual bool Raise<TEvent>(in TEvent @event) where TEvent : TBaseEvent
 		{
 			if (!IsEventBeingRaised)
 			{
-				RaiseImmediately(@event);
+				return RaiseImmediately(@event);
 			}
-			else
-			{
-				var listeners = EventListeners<TEvent>.GetListeners(this);
-				listeners.EnqueueEvent(in @event);
-			}
+
+			var listeners = EventListeners<TEvent>.GetListeners(this);
+			listeners.EnqueueEvent(in @event);
+
+			return false;
 		}
 
 		/// <summary>
@@ -141,6 +146,22 @@ namespace GenericEventBus
 			}
 		}
 
+		public void ClearListeners<TEvent>() where TEvent : TBaseEvent
+		{
+			if (IsEventBeingRaised)
+			{
+				throw new InvalidOperationException("Not allowed to clear listeners while an event is being raised.");
+			}
+			
+			ClearAllListeners<TEvent>();
+		}
+
+		protected virtual void ClearAllListeners<TEvent>() where TEvent : TBaseEvent
+		{
+			var listeners = EventListeners<TEvent>.GetListeners(this);
+			listeners.Clear();
+		}
+
 		protected void OnBeforeRaiseEvent()
 		{
 			_currentRaiseRecursionDepth++;
@@ -148,9 +169,7 @@ namespace GenericEventBus
 
 		protected void OnAfterRaiseEvent()
 		{
-			_raiseRecursionsConsumed.Remove(_currentRaiseRecursionDepth);
-
-			_currentRaiseRecursionDepth--;
+			_raiseRecursionsConsumed.Remove(_currentRaiseRecursionDepth--);
 
 			if (_currentRaiseRecursionDepth == 0)
 			{
@@ -330,6 +349,11 @@ namespace GenericEventBus
 				{
 					throw new NotImplementedException();
 				}
+			}
+
+			public void Clear()
+			{
+				_sortedListeners.Clear();
 			}
 		}
 	}
