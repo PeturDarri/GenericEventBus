@@ -103,7 +103,7 @@ private void OnGameStartedEventPriority(ref GameStartedEvent eventData)
 The default `priority` is `0` and listeners with the same priority will be invoked in the order they were added.
 
 ### Targeted events
-Things get a lot more interesting when using targeted events. You can think of this more like a message bus, where objects can raise events that are meant to be heard by specific target object.
+Things get a lot more interesting when using targeted events. You can think of this more like a message bus, where objects can raise events that are meant to be heard by a specific target object.
 
 To use targeted events, you must include a second generic type parameter in `GenericEventBus` to specify what type of object can be a target, like `GameObject`:
 ```c#
