@@ -133,7 +133,7 @@ private void OnEnable()
 
 private void OnDisable()
 {
-    eventBus.UnsubscribeFromTarget<DamagedEvent>gameObject, OnDamagedEvent);
+    eventBus.UnsubscribeFromTarget<DamagedEvent>(gameObject, OnDamagedEvent);
 }
 
 private void OnDamagedEvent(ref DamagedEvent eventData, GameObject target, GameObject source)
