@@ -225,12 +225,12 @@ namespace GenericEventBus
 
 		private class TargetedEventListeners<TEvent> where TEvent : TBaseEvent
 		{
-			private static readonly ConditionalWeakTable<GenericEventBus<TBaseEvent, TObject>,
+			private static readonly Dictionary<GenericEventBus<TBaseEvent, TObject>,
 				TargetedEventListeners<TEvent>> Listeners =
-				new ConditionalWeakTable<GenericEventBus<TBaseEvent, TObject>, TargetedEventListeners<TEvent>>();
+				new Dictionary<GenericEventBus<TBaseEvent, TObject>, TargetedEventListeners<TEvent>>();
 
-			private static readonly ConditionalWeakTable<EventHandler<TEvent>, TargetedEventHandler<TEvent>>
-				ConvertedEventHandlers = new ConditionalWeakTable<EventHandler<TEvent>, TargetedEventHandler<TEvent>>();
+			private static readonly Dictionary<EventHandler<TEvent>, TargetedEventHandler<TEvent>>
+				ConvertedEventHandlers = new Dictionary<EventHandler<TEvent>, TargetedEventHandler<TEvent>>();
 
 			private static readonly ObjectPool<Enumerator> EnumeratorPool = new ObjectPool<Enumerator>();
 
@@ -238,14 +238,6 @@ namespace GenericEventBus
 				new ObjectPool<DerivedQueuedEvent>();
 
 			private static readonly ObjectPool<List<Listener>> ListenerListPool = new ObjectPool<List<Listener>>();
-
-			private static readonly
-				ConditionalWeakTable<GenericEventBus<TBaseEvent, TObject>, TargetedEventListeners<TEvent>>.
-				CreateValueCallback CreateListeners = key => new TargetedEventListeners<TEvent>(key);
-
-			private static readonly ConditionalWeakTable<EventHandler<TEvent>, TargetedEventHandler<TEvent>>.
-				CreateValueCallback CreateConvertedEventHandler = key =>
-					(ref TEvent @event, TObject target, TObject source) => key(ref @event);
 
 			static TargetedEventListeners()
 			{
@@ -255,7 +247,20 @@ namespace GenericEventBus
 
 			public static TargetedEventListeners<TEvent> Get(GenericEventBus<TBaseEvent, TObject> eventBus)
 			{
-				return Listeners.GetValue(eventBus, CreateListeners);
+				if (!Listeners.TryGetValue(eventBus, out var listeners))
+				{
+					listeners = new TargetedEventListeners<TEvent>(eventBus);
+					Listeners.Add(eventBus, listeners);
+					
+					eventBus.DisposeEvent += EventBusOnDisposeEvent;
+				}
+
+				return listeners;
+			}
+
+			private static void EventBusOnDisposeEvent(GenericEventBus<TBaseEvent> eventBus)
+			{
+				Listeners.Remove((GenericEventBus<TBaseEvent, TObject>) eventBus);
 			}
 
 			private readonly GenericEventBus<TBaseEvent, TObject> _eventBus;
@@ -309,8 +314,13 @@ namespace GenericEventBus
 
 			public void AddListener(EventHandler<TEvent> handler, float priority)
 			{
-				var converted = ConvertedEventHandlers.GetValue(handler, CreateConvertedEventHandler);
-				AddListener(converted, priority);
+				if (!ConvertedEventHandlers.TryGetValue(handler, out var convertedHandler))
+				{
+					convertedHandler = (ref TEvent data, TObject target, TObject source) => handler(ref data);
+					ConvertedEventHandlers.Add(handler, convertedHandler);
+				}
+				
+				AddListener(convertedHandler, priority);
 			}
 
 			public void RemoveListener(EventHandler<TEvent> handler)
@@ -318,6 +328,8 @@ namespace GenericEventBus
 				if (ConvertedEventHandlers.TryGetValue(handler, out var targetedHandler))
 				{
 					RemoveListener(targetedHandler);
+
+					ConvertedEventHandlers.Remove(handler);
 				}
 			}
 

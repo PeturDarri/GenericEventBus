@@ -12,7 +12,7 @@ namespace GenericEventBus
 	/// If you want to be able to raise events that are targeted to specific objects and that can have source objects, use <see cref="GenericEventBus{TEvent, TObject}"/> instead.
 	/// </summary>
 	/// <typeparam name="TBaseEvent"><para>The base type all events must inherit/implement.</para> If you don't want to restrict event types to a base type, use <see cref="object"/> as the base type.</typeparam>
-	public class GenericEventBus<TBaseEvent>
+	public class GenericEventBus<TBaseEvent> : IDisposable
 	{
 		static GenericEventBus()
 		{
@@ -25,6 +25,8 @@ namespace GenericEventBus
 		protected readonly Queue<QueuedEvent> QueuedEvents = new Queue<QueuedEvent>(32);
 
 		private uint _currentRaiseRecursionDepth;
+
+		protected event Action<GenericEventBus<TBaseEvent>> DisposeEvent;
 
 		/// <summary>
 		/// Has the current raised event been consumed?
@@ -173,6 +175,13 @@ namespace GenericEventBus
 			ClearAllListeners<TEvent>();
 		}
 
+		public virtual void Dispose()
+		{
+			DisposeEvent?.Invoke(this);
+			
+			DisposeEvent = null;
+		}
+
 		protected virtual void ClearAllListeners<TEvent>() where TEvent : TBaseEvent
 		{
 			var listeners = EventListeners<TEvent>.GetListeners(this);
@@ -204,20 +213,16 @@ namespace GenericEventBus
 		{
 			public abstract void Raise(GenericEventBus<TBaseEvent> eventBus);
 		}
-		
+
 		private sealed class EventListeners<TEvent> : IEnumerable<EventHandler<TEvent>> where TEvent : TBaseEvent
 		{
-			private static readonly ConditionalWeakTable<GenericEventBus<TBaseEvent>, EventListeners<TEvent>>
-				Listeners = new ConditionalWeakTable<GenericEventBus<TBaseEvent>, EventListeners<TEvent>>();
+			private static readonly Dictionary<GenericEventBus<TBaseEvent>, EventListeners<TEvent>>
+				Listeners = new Dictionary<GenericEventBus<TBaseEvent>, EventListeners<TEvent>>();
 
 			private static readonly ObjectPool<Enumerator> EnumeratorPool = new ObjectPool<Enumerator>();
 
 			private static readonly ObjectPool<DerivedQueuedEvent> QueuedEventPool =
 				new ObjectPool<DerivedQueuedEvent>();
-
-			private static readonly
-				ConditionalWeakTable<GenericEventBus<TBaseEvent>, EventListeners<TEvent>>.CreateValueCallback
-				CreateListeners = key => new EventListeners<TEvent>(key);
 
 			static EventListeners()
 			{
@@ -227,7 +232,20 @@ namespace GenericEventBus
 
 			public static EventListeners<TEvent> GetListeners(GenericEventBus<TBaseEvent> eventBus)
 			{
-				return Listeners.GetValue(eventBus, CreateListeners);
+				if (!Listeners.TryGetValue(eventBus, out var listeners))
+				{
+					listeners = new EventListeners<TEvent>(eventBus);
+					Listeners.Add(eventBus, listeners);
+
+					eventBus.DisposeEvent += EventBusOnDisposeEvent;
+				}
+
+				return listeners;
+			}
+
+			private static void EventBusOnDisposeEvent(GenericEventBus<TBaseEvent> eventBus)
+			{
+				Listeners.Remove(eventBus);
 			}
 
 			private readonly GenericEventBus<TBaseEvent> _eventBus;
