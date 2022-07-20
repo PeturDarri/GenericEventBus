@@ -3,7 +3,6 @@
     "rootNamespace": "GenericEventBus.Editor.Tests",
     "references": [
         "GenericEventBus",
-        "GenericEventBus.Editor",
         "GenericEventBus.Tests",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
