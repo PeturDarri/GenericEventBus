@@ -9,25 +9,27 @@ namespace GenericEventBus.Editor.Tests
 		[Test]
 		public void SubscribeRaiseUnsubscribeRaise_Works()
 		{
-			var bus = new TargetedTestEventBus();
-			var targetListener = bus.TestListener<StructTestEvent>();
-			var sourceListener = bus.TestListener<StructTestEvent>();
+			using (var bus = new TargetedTestEventBus())
+			{
+				var targetListener = bus.TestListener<StructTestEvent>();
+				var sourceListener = bus.TestListener<StructTestEvent>();
 
-			var target = new object();
-			var source = new object();
-			
-			targetListener.SubscribeTarget(target);
-			sourceListener.SubscribeSource(source);
+				var target = new object();
+				var source = new object();
 
-			bus.Raise(new StructTestEvent(), target, source);
-			targetListener.AssertReceivedFrom(target, source);
-			sourceListener.AssertReceivedFrom(target, source);
+				targetListener.SubscribeTarget(target);
+				sourceListener.SubscribeSource(source);
 
-			targetListener.UnsubscribeTarget(target);
-			sourceListener.UnsubscribeSource(source);
-			bus.Raise(new StructTestEvent(), target, source);
-			targetListener.AssertDidNotReceive();
-			sourceListener.AssertDidNotReceive();
+				bus.Raise(new StructTestEvent(), target, source);
+				targetListener.AssertReceivedFrom(target, source);
+				sourceListener.AssertReceivedFrom(target, source);
+
+				targetListener.UnsubscribeTarget(target);
+				sourceListener.UnsubscribeSource(source);
+				bus.Raise(new StructTestEvent(), target, source);
+				targetListener.AssertDidNotReceive();
+				sourceListener.AssertDidNotReceive();
+			}
 		}
 	}
 }

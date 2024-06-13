@@ -2,7 +2,7 @@
   "name": "com.peturdarri.generic-event-bus",
   "displayName": "GenericEventBus",
   "author": "Pétur Darri Pétursson",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "unity": "2019.4",
   "description": "A synchronous event bus for Unity, using strictly typed events and generics to reduce runtime overhead.",
   "type": "library"
