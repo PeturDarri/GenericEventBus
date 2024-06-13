@@ -24,6 +24,12 @@ var eventBus = new GenericEventBus<IEvent>();
 Otherwise, _any_ object can be raised as an event, which is weird and confusing.
 
 ---
+For ease of use, I recommend inheriting `GenericEventBus<TBaseEvent>` with your own type and using that in your code instead:
+```cs
+public class GameEventBus : GenericEventBus<IEvent> {}
+```
+
+---
 
 To define new events, just define a type that inherits/implements your base event type:
 ```c#
