@@ -28,6 +28,7 @@ For ease of use, I recommend inheriting `GenericEventBus<TBaseEvent>` with your 
 ```cs
 public class GameEventBus : GenericEventBus<IEvent> {}
 ```
+> 💡 If you want to use the event bus as a static class for easier access, you can make a static wrapper using [this template](https://gist.github.com/PeturDarri/233cae6571041e8b48d3584fb781f902).
 
 ---
 
@@ -40,7 +41,7 @@ public struct GameStartedEvent : IEvent
 <details>
   <summary><em>Can events be defined as classes instead?</em></summary>
 
-Events can be defined as either `class` or `struct`, but I recommend using structs to avoid allocation when creating new instances. Events are passed around in the event bus and to listeners by references  using `ref`, so you don't have to worry about the overhead of struct copying.
+Events can be defined as either `class` or `struct`, but I recommend using structs to avoid allocation when creating new instances. Events are passed around in the event bus and to listeners by references using `ref`, so you don't have to worry about the overhead of struct copying.
 
 And you also don't need to worry about the struct being boxed. Generic type parameters ensure it is never boxed.
 </details>
